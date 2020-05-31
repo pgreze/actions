@@ -2,6 +2,9 @@ package com.github.pgreze
 
 fun main(args: Array<String>) {
     actions(args) {
+        beforeAll { println("Run ${it.commandName}") }
+        afterAll { println("Finished ${it.commandName}") }
+
         val buildDebug = action("build-debug", help = "Build APK and upload it to App Distribution") {
             println("Hello world")
         }

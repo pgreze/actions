@@ -10,6 +10,8 @@ import kotlin.math.max
 fun actions(args: Array<String>, block: ActionContext.() -> Unit) =
     ActionContext().also(block).main(args)
 
+typealias ActionListener = ActionContext.(Action) -> Unit
+
 class ActionContext : NoOpCliktCommand(
     name = "actions",
     invokeWithoutSubcommand = false,
@@ -17,34 +19,97 @@ class ActionContext : NoOpCliktCommand(
 ) {
     val verbose by option("-v").flag("--verbose", default = false)
 
+    private var firstAction: Action? = null
+    private var beforeAll: ActionListener = { it.firstActionBegin() }
+    private var afterAll: ActionListener = { it.firstActionEnd() }
+    private var beforeEach: ActionListener = { if (verbose) echo(">> Start ${it.commandName}") }
+    private var afterEach: ActionListener = { if (verbose) echo(">> End ${it.commandName}") }
+
     fun action(
         name: String,
         help: String = "",
         block: () -> Unit
     ): Action =
         Action(this, name, help, block)
+
+    fun beforeAll(block: ActionListener) {
+        val previous = beforeAll
+        beforeAll = {
+            previous(this, it)
+            block(this, it)
+        }
+    }
+
+    fun afterAll(block: ActionListener) {
+        val previous = afterAll
+        afterAll = {
+            block(this, it)
+            previous(this, it)
+        }
+    }
+
+    fun beforeEach(block: ActionListener) {
+        val previous = beforeEach
+        beforeEach = {
+            previous(this, it)
+            block(this, it)
+        }
+    }
+
+    fun afterEach(block: ActionListener) {
+        val previous = afterEach
+        afterEach = {
+            block(this, it)
+            previous(this, it)
+        }
+    }
+
+    internal fun onBeforeAction(action: Action): Boolean =
+        if (firstAction == null) {
+            firstAction = action
+            beforeAll.invoke(this, action)
+            true
+        } else {
+            false
+        }.also { beforeEach(action) }
+
+    internal fun onAfterAction(action: Action) {
+        afterEach(action)
+        if (firstAction == action) {
+            afterAll.invoke(this, action)
+        }
+    }
 }
 
 class Action(
-    context: ActionContext,
+    private val actionContext: ActionContext,
     name: String,
     help: String = "",
     private val block: () -> Unit
 ) : CliktCommand(name = name, help = help) {
     init {
-        context.subcommands(this)
+        actionContext.subcommands(this)
     }
 
     override fun run() {
-        echo(announce("Start $commandName", commandHelp.takeIf(String::isNotEmpty)))
-        echo("")
+        actionContext.onBeforeAction(this)
         block()
-        echo("")
-        echo(announce("End $commandName"))
-        echo("")
+        actionContext.onAfterAction(this)
     }
 
     operator fun invoke() = run()
+}
+
+// TODO: provide echo outside a command
+private fun Action.firstActionBegin() {
+    println(announce("Start $commandName", commandHelp.takeIf(String::isNotEmpty)))
+    println("")
+}
+
+private fun Action.firstActionEnd() {
+    println("")
+    println(announce("End $commandName"))
+    println("")
 }
 
 private fun announce(title: String, subtitle: String? = null): String {
