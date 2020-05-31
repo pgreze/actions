@@ -10,7 +10,7 @@ import kotlin.math.max
 fun actions(args: Array<String>, block: ActionContext.() -> Unit) =
     ActionContext().also(block).main(args)
 
-typealias ActionListener = ActionContext.(Action<*>) -> Unit
+typealias ActionLifecycle = ActionContext.(Action<*>) -> Unit
 
 class ActionContext : NoOpCliktCommand(
     name = "actions",
@@ -22,10 +22,10 @@ class ActionContext : NoOpCliktCommand(
     val actions: List<Action<*>> = _actions
 
     private var firstAction: Action<*>? = null
-    private var beforeAll: ActionListener = { it.firstActionBegin() }
-    private var afterAll: ActionListener = { it.firstActionEnd() }
-    private var beforeEach: ActionListener = { if (verbose) echo(">> Start ${it.commandName}") }
-    private var afterEach: ActionListener = { if (verbose) echo(">> End ${it.commandName}") }
+    private var beforeAll: ActionLifecycle = { it.firstActionBegin() }
+    private var afterAll: ActionLifecycle = { it.firstActionEnd() }
+    private var beforeEach: ActionLifecycle = { if (verbose) echo(">> Start ${it.commandName}") }
+    private var afterEach: ActionLifecycle = { if (verbose) echo(">> End ${it.commandName}") }
 
     fun <T> action(
         name: String,
@@ -33,36 +33,20 @@ class ActionContext : NoOpCliktCommand(
         block: () -> T
     ): Action<T> = Action(this, name, help, block)
 
-    fun beforeAll(block: ActionListener) {
-        val previous = beforeAll
-        beforeAll = {
-            previous(this, it)
-            block(this, it)
-        }
+    fun beforeAll(block: ActionLifecycle) {
+        beforeAll = beforeAll.finalizeBy(block)
     }
 
-    fun afterAll(block: ActionListener) {
-        val previous = afterAll
-        afterAll = {
-            block(this, it)
-            previous(this, it)
-        }
+    fun afterAll(block: ActionLifecycle) {
+        afterAll = block.finalizeBy(afterAll)
     }
 
-    fun beforeEach(block: ActionListener) {
-        val previous = beforeEach
-        beforeEach = {
-            previous(this, it)
-            block(this, it)
-        }
+    fun beforeEach(block: ActionLifecycle) {
+        beforeEach = beforeEach.finalizeBy(block)
     }
 
-    fun afterEach(block: ActionListener) {
-        val previous = afterEach
-        afterEach = {
-            block(this, it)
-            previous(this, it)
-        }
+    fun afterEach(block: ActionLifecycle) {
+        afterEach = block.finalizeBy(afterEach)
     }
 
     internal fun onBeforeAction(action: Action<*>): Boolean =
@@ -103,6 +87,11 @@ class Action<T>(
             actionContext.onAfterAction(this)
         }
     }
+}
+
+private fun ActionLifecycle.finalizeBy(block: ActionLifecycle): ActionLifecycle = {
+    this@finalizeBy(this, it)
+    block(this, it)
 }
 
 // TODO: provide echo outside a command
