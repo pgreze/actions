@@ -17,7 +17,11 @@ class ActionContext : NoOpCliktCommand(
     invokeWithoutSubcommand = false,
     allowMultipleSubcommands = true
 ) {
-    val verbose by option("-v").flag("--verbose", default = false)
+    val quiet by option("-q", help = "Disable all internal logging using echo")
+        .flag("--quiet", default = false)
+    val verbose by option("-v", help = "Display debug information like shell commands, etc")
+        .flag("--verbose", default = false)
+
     internal val _actions = mutableListOf<Action<*>>()
     val actions: List<Action<*>> = _actions
 
@@ -28,14 +32,20 @@ class ActionContext : NoOpCliktCommand(
     private var afterAll: ActionLifecycle = lifecyclePrinter({ echo(it) }, before = "") {
         announce("End $commandName")
     }
-    private var beforeEach: ActionLifecycle = { if (verbose) echo(">> Start ${it.commandName}") }
-    private var afterEach: ActionLifecycle = { if (verbose) echo(">> End ${it.commandName}") }
+    private var beforeEach: ActionLifecycle = { echo(">> Start ${it.commandName}", verbose = true) }
+    private var afterEach: ActionLifecycle = { echo(">> End ${it.commandName}", verbose = true) }
 
     fun <T> action(
         name: String,
         help: String = "",
         block: () -> T
     ): Action<T> = Action(this, name, help, block)
+
+    fun echo(msg: Any?, err: Boolean = false, verbose: Boolean = false) {
+        if (!quiet && (!verbose || this.verbose)) {
+            super.echo(msg, trailingNewline = true, err = err, lineSeparator = currentContext.console.lineSeparator)
+        }
+    }
 
     fun beforeAll(block: ActionLifecycle) {
         beforeAll = beforeAll.finalizeBy(block)
