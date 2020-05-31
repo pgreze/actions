@@ -10,7 +10,7 @@ import kotlin.math.max
 fun actions(args: Array<String>, block: ActionContext.() -> Unit) =
     ActionContext().also(block).main(args)
 
-typealias ActionListener = ActionContext.(Action) -> Unit
+typealias ActionListener = ActionContext.(Action<*>) -> Unit
 
 class ActionContext : NoOpCliktCommand(
     name = "actions",
@@ -19,17 +19,17 @@ class ActionContext : NoOpCliktCommand(
 ) {
     val verbose by option("-v").flag("--verbose", default = false)
 
-    private var firstAction: Action? = null
+    private var firstAction: Action<*>? = null
     private var beforeAll: ActionListener = { it.firstActionBegin() }
     private var afterAll: ActionListener = { it.firstActionEnd() }
     private var beforeEach: ActionListener = { if (verbose) echo(">> Start ${it.commandName}") }
     private var afterEach: ActionListener = { if (verbose) echo(">> End ${it.commandName}") }
 
-    fun action(
+    fun <T> action(
         name: String,
         help: String = "",
-        block: () -> Unit
-    ): Action =
+        block: () -> T
+    ): Action<T> =
         Action(this, name, help, block)
 
     fun beforeAll(block: ActionListener) {
@@ -64,7 +64,7 @@ class ActionContext : NoOpCliktCommand(
         }
     }
 
-    internal fun onBeforeAction(action: Action): Boolean =
+    internal fun onBeforeAction(action: Action<*>): Boolean =
         if (firstAction == null) {
             firstAction = action
             beforeAll.invoke(this, action)
@@ -73,7 +73,7 @@ class ActionContext : NoOpCliktCommand(
             false
         }.also { beforeEach(action) }
 
-    internal fun onAfterAction(action: Action) {
+    internal fun onAfterAction(action: Action<*>) {
         afterEach(action)
         if (firstAction == action) {
             afterAll.invoke(this, action)
@@ -81,32 +81,35 @@ class ActionContext : NoOpCliktCommand(
     }
 }
 
-class Action(
+class Action<T>(
     private val actionContext: ActionContext,
     name: String,
     help: String = "",
-    private val block: () -> Unit
+    private val block: () -> T
 ) : CliktCommand(name = name, help = help) {
     init {
         actionContext.subcommands(this)
     }
 
     override fun run() {
-        actionContext.onBeforeAction(this)
-        block()
-        actionContext.onAfterAction(this)
+        invoke()
     }
 
-    operator fun invoke() = run()
+    operator fun invoke(): T {
+        actionContext.onBeforeAction(this)
+        return block().also {
+            actionContext.onAfterAction(this)
+        }
+    }
 }
 
 // TODO: provide echo outside a command
-private fun Action.firstActionBegin() {
+private fun <T> Action<T>.firstActionBegin() {
     println(announce("Start $commandName", commandHelp.takeIf(String::isNotEmpty)))
     println("")
 }
 
-private fun Action.firstActionEnd() {
+private fun <T> Action<T>.firstActionEnd() {
     println("")
     println(announce("End $commandName"))
     println("")

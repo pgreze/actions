@@ -1,5 +1,7 @@
 package com.github.pgreze
 
+import java.io.File
+
 fun main(args: Array<String>) {
     actions(args) {
         beforeAll { println("Run ${it.commandName}") }
@@ -7,11 +9,12 @@ fun main(args: Array<String>) {
 
         val buildDebug = action("build-debug", help = "Build APK and upload it to App Distribution") {
             println("Hello world")
+            return@action File("my/debug.apk")
         }
 
         action("upload-to-play-store", help = "Upload APK to the Play Store") {
-            buildDebug()
-            println("Upload to play store")
+            val apk: File = buildDebug()
+            println("Upload $apk to play store")
         }
 
         action("list-projects") {
