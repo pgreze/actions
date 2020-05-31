@@ -22,8 +22,12 @@ class ActionContext : NoOpCliktCommand(
     val actions: List<Action<*>> = _actions
 
     private var firstAction: Action<*>? = null
-    private var beforeAll: ActionLifecycle = { it.firstActionBegin() }
-    private var afterAll: ActionLifecycle = { it.firstActionEnd() }
+    private var beforeAll: ActionLifecycle = lifecyclePrinter({ echo(it) }) {
+        announce("Start $commandName", commandHelp.takeIf(String::isNotEmpty))
+    }
+    private var afterAll: ActionLifecycle = lifecyclePrinter({ echo(it) }, before = "") {
+        announce("End $commandName")
+    }
     private var beforeEach: ActionLifecycle = { if (verbose) echo(">> Start ${it.commandName}") }
     private var afterEach: ActionLifecycle = { if (verbose) echo(">> End ${it.commandName}") }
 
@@ -94,16 +98,15 @@ private fun ActionLifecycle.finalizeBy(block: ActionLifecycle): ActionLifecycle 
     block(this, it)
 }
 
-// TODO: provide echo outside a command
-private fun <T> Action<T>.firstActionBegin() {
-    println(announce("Start $commandName", commandHelp.takeIf(String::isNotEmpty)))
-    println("")
-}
-
-private fun <T> Action<T>.firstActionEnd() {
-    println("")
-    println(announce("End $commandName"))
-    println("")
+private fun lifecyclePrinter(
+    echo: (String) -> Unit,
+    before: String? = null,
+    after: String = "",
+    accouncer: Action<*>.() -> String
+): ActionLifecycle = {
+    before?.let { s -> echo(s) }
+    echo(it.accouncer())
+    echo(after)
 }
 
 private fun announce(title: String, subtitle: String? = null): String {
