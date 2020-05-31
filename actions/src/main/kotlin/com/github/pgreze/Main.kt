@@ -22,6 +22,8 @@ fun main(args: Array<String>) {
             val projects = cmd.out
                 .let { out -> Regex("':(.*)'").findAll(out).asIterable().map { it.groups.last()?.value } }
             println("Projects:" + projects.fold("") { s1, s2 -> "$s1 $s2" })
+
+            println("Can be consumed by ${actions.size} actions")
         }
     }
 }

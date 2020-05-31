@@ -18,6 +18,8 @@ class ActionContext : NoOpCliktCommand(
     allowMultipleSubcommands = true
 ) {
     val verbose by option("-v").flag("--verbose", default = false)
+    internal val _actions = mutableListOf<Action<*>>()
+    val actions: List<Action<*>> = _actions
 
     private var firstAction: Action<*>? = null
     private var beforeAll: ActionListener = { it.firstActionBegin() }
@@ -29,8 +31,7 @@ class ActionContext : NoOpCliktCommand(
         name: String,
         help: String = "",
         block: () -> T
-    ): Action<T> =
-        Action(this, name, help, block)
+    ): Action<T> = Action(this, name, help, block)
 
     fun beforeAll(block: ActionListener) {
         val previous = beforeAll
@@ -88,6 +89,7 @@ class Action<T>(
     private val block: () -> T
 ) : CliktCommand(name = name, help = help) {
     init {
+        actionContext._actions.add(this)
         actionContext.subcommands(this)
     }
 
