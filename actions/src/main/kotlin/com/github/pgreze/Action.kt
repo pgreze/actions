@@ -63,14 +63,13 @@ class ActionContext : NoOpCliktCommand(
         afterEach = block.finalizeBy(afterEach)
     }
 
-    internal fun onBeforeAction(action: Action<*>): Boolean =
+    internal fun onBeforeAction(action: Action<*>) {
         if (firstAction == null) {
             firstAction = action
             beforeAll.invoke(this, action)
-            true
-        } else {
-            false
-        }.also { beforeEach(action) }
+        }
+        beforeEach(action)
+    }
 
     internal fun onAfterAction(action: Action<*>) {
         afterEach(action)
