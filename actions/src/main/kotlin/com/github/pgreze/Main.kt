@@ -17,9 +17,14 @@ fun main(args: Array<String>) = actions(args) {
     }
 
     action("list-projects") {
-        val cmd = gradle("projects")
+        val cmd = run(gradle("projects"))
         val projects = cmd.out
             .let { out -> Regex("':(.*)'").findAll(out).asIterable().map { it.groups.last()?.value } }
         println("${actions.size} actions can be used on following projects:" + projects.fold("") { s1, s2 -> "$s1 $s2" })
+    }
+
+    action("shell") {
+        run("ls ~/.my | cat")
+        run("echo home=\$HOME")
     }
 }
